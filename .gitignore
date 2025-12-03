@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+emergency.wav
+emergency.mp3
+static/evidence_*.pdf
