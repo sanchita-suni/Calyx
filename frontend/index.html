@@ -12,45 +12,53 @@
         @keyframes pulse-animation { 0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.7); } 100% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); } }
         .sos-pulse { animation: sos-animation 1s infinite; }
         @keyframes sos-animation { 0% { box-shadow: 0 0 0 0px rgba(220, 38, 38, 0.7); } 100% { box-shadow: 0 0 0 30px rgba(220, 38, 38, 0); } }
-        .alert-toast { position: fixed; top: 20px; right: 20px; background: #22c55e; color: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.5s; z-index: 50; }
+        .alert-toast { position: fixed; top: 20px; right: 20px; background: #22c55e; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.5s; z-index: 50; font-weight: bold; }
         .show-toast { opacity: 1; }
+        .brand-text { background: linear-gradient(to right, #60a5fa, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center h-screen p-4 overflow-hidden">
-    <div class="absolute top-5 left-5 text-gray-400 text-sm">
-        <span class="font-bold text-blue-400">CALYX</span> // MURF FALCON
+<body class="flex flex-col items-center justify-center h-screen p-4 overflow-hidden relative">
+    
+    <div class="absolute top-6 left-6">
+        <h1 class="text-3xl font-black tracking-widest brand-text">CALYX</h1>
     </div>
 
-    <div id="toast" class="alert-toast">Emergency Alert Sent!</div>
+    <div id="toast" class="alert-toast">Alert Sent!</div>
 
-    <div class="bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm text-center border border-slate-700 relative overflow-hidden flex flex-col items-center">
+    <div class="bg-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center border border-slate-700 relative overflow-hidden flex flex-col items-center">
         
-        <div id="modeIcon" class="text-6xl mb-4 text-blue-400 transition-all duration-500 mt-4">
+        <div id="modeIcon" class="text-6xl mb-4 text-blue-400 transition-all duration-500 mt-6">
             <i class="fas fa-shield-alt"></i>
         </div>
 
-        <h1 id="statusText" class="text-2xl font-bold mb-1">System Offline</h1>
-        <p id="subStatus" class="text-gray-400 text-xs mb-6">Guardian Relay Inactive.</p>
+        <h1 id="statusText" class="text-2xl font-bold mb-1 text-white">System Offline</h1>
+        <p id="subStatus" class="text-gray-400 text-xs mb-6 font-mono">Guardian Relay Inactive.</p>
 
-        <div id="sosContainer" class="hidden mb-6">
-            <button id="sosBtn" class="bg-red-600 active:bg-red-800 text-white font-bold h-24 w-24 rounded-full shadow-lg text-xs flex flex-col items-center justify-center gap-1 border-4 border-red-800 transition-transform active:scale-95">
-                <i class="fas fa-exclamation-triangle text-2xl"></i> SOS
+        <div id="sosContainer" class="hidden mb-6 w-full flex justify-center">
+            <button id="sosBtn" class="bg-red-600 active:bg-red-800 text-white font-bold h-28 w-28 rounded-full shadow-2xl text-xs flex flex-col items-center justify-center gap-1 border-4 border-red-800 transition-transform active:scale-95">
+                <i class="fas fa-exclamation-triangle text-3xl mb-1"></i>
+                SILENT SOS
             </button>
-            <p class="text-xs text-red-400 mt-2 animate-pulse">Tap for Silent Help</p>
         </div>
+        <p id="sosHint" class="hidden text-xs text-red-400 mb-4 animate-pulse">Tap to call Emergency Contact silently</p>
 
-        <div id="visContainer" class="bg-slate-900 rounded-lg mb-6 w-full h-24 border border-slate-700 overflow-hidden relative">
+        <div id="visContainer" class="bg-slate-900 rounded-xl mb-6 w-full h-24 border border-slate-700 overflow-hidden relative">
             <canvas id="visualizer" class="w-full h-full opacity-30"></canvas>
         </div>
 
-        <button id="toggleBtn" class="bg-blue-600 active:bg-blue-700 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg">
+        <button id="toggleBtn" class="bg-blue-600 active:bg-blue-700 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg transition-colors">
             <i class="fas fa-microphone"></i> Initialize Calyx
         </button>
+
+        <a id="downloadBtn" href="#" download class="hidden mt-4 text-blue-400 text-sm underline hover:text-blue-300">
+            <i class="fas fa-file-pdf mr-1"></i> Download Evidence Report
+        </a>
     </div>
 
     <script>
         let socket;
         let audioContext;
+        let analyser;
         let isRecording = false;
         let audioQueue = [];
         let isPlaying = false;
@@ -58,33 +66,49 @@
 
         const btn = document.getElementById('toggleBtn');
         const sosBtn = document.getElementById('sosBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
         const statusText = document.getElementById('statusText');
+        const subStatus = document.getElementById('subStatus');
         const modeIcon = document.getElementById('modeIcon');
         const toast = document.getElementById("toast");
         const canvas = document.getElementById("visualizer");
         const ctx = canvas.getContext("2d");
-        let analyser;
 
         btn.onclick = async () => { if (!isRecording) await startConnection(); else endSession(); };
-        sosBtn.onclick = () => { if(socket) { socket.send("TRIGGER_SOS"); sosBtn.classList.add("sos-pulse"); } };
+        
+        sosBtn.onclick = () => { 
+            if(socket && socket.readyState === WebSocket.OPEN) { 
+                socket.send("TRIGGER_SOS"); 
+                sosBtn.classList.add("sos-pulse");
+                subStatus.innerText = "Calling Emergency Contact...";
+                statusText.innerText = "SILENT ALARM";
+                statusText.classList.add("text-red-500");
+            } 
+        };
 
         function showToast(msg) {
             toast.innerText = msg;
             toast.classList.add("show-toast");
-            setTimeout(() => toast.classList.remove("show-toast"), 3000);
+            setTimeout(() => toast.classList.remove("show-toast"), 4000);
         }
 
         async function startConnection() {
-            // Mobile Safari needs User Interaction for AudioContext
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            } else if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            const wsUrl = "ws://localhost:8000/ws/chat";
             
-            socket = new WebSocket("ws://localhost:8000/ws/chat");
+            socket = new WebSocket(wsUrl);
             socket.binaryType = 'arraybuffer';
             
             socket.onopen = async () => { 
                 updateUI(true); 
-                await initAudio(); 
-                sendLocation(); 
+                await initStream();
+
+                setTimeout(sendLocation, 1500);
             };
             
             socket.onmessage = async (event) => {
@@ -92,26 +116,34 @@
                 if (typeof data === "string") {
                     if (data.startsWith("MODE:")) updateMode(data.split(":")[1]);
                     if (data === "CLEAR") clearAudioQueue();
+                    
                     if (data === "ALERT_SENT") { 
                         showToast("Contact Notified!"); 
-                        sosBtn.classList.remove("sos-pulse"); 
+                        sosBtn.classList.remove("sos-pulse");
                         statusText.innerText = "HELP ON WAY";
-                        statusText.classList.add("text-green-500");
+                        statusText.className = "text-2xl font-bold mb-1 text-green-400";
                     }
+                    
                     if (data.startsWith("DOWNLOAD:")) { 
-                        showToast("Evidence Saved.");
-                        window.location.href = "/static/" + data.split(":")[1];
+                        showToast("Evidence Secure.");
+                        const link = "/static/" + data.split(":")[1];
+                        downloadBtn.href = link;
+                        downloadBtn.classList.remove("hidden");
                         stopConnection(); 
                     }
-                } else queueAudio(data);
+                } else {
+                    queueAudio(data);
+                }
             };
             socket.onclose = () => stopConnection();
+            socket.onerror = (e) => { console.error(e); stopConnection(); };
         }
 
         function endSession() {
             if(socket && socket.readyState === WebSocket.OPEN) {
-                socket.send("END_SESSION"); // Trigger backend to generate PDF
+                socket.send("END_SESSION");
                 showToast("Generating Report...");
+                statusText.innerText = "Saving...";
             } else {
                 stopConnection();
             }
@@ -119,38 +151,67 @@
 
         function stopConnection() { 
             if (socket) socket.close(); 
-            if (audioContext) audioContext.close(); 
             updateUI(false); 
             isRecording = false; 
         }
         
-        function sendLocation() { 
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (p) => {
-                        const loc = `LOC:${p.coords.latitude},${p.coords.longitude}`;
-                        if(socket && socket.readyState === 1) socket.send(loc);
-                    },
-                    (e) => console.log("GPS Error"),
-                    { enableHighAccuracy: true }
-                );
-            }
+        let locationSent = false;
+
+        function sendLocation() {
+            if (locationSent || !navigator.geolocation) return;
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const loc = `LOC:${latitude},${longitude}`;
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(loc);
+                        console.log("📍 Location sent:", loc);
+                        locationSent = true;
+                    }
+                },
+                (err) => console.log("❌ GPS Error:", err),
+                { enableHighAccuracy: true, timeout: 7000 }
+            );
         }
 
-        async function queueAudio(ab) { audioQueue.push(await audioContext.decodeAudioData(ab)); if (!isPlaying) playNext(); }
-        function playNext() { if (audioQueue.length === 0) { isPlaying = false; return; } isPlaying = true; currentSource = audioContext.createBufferSource(); currentSource.buffer = audioQueue.shift(); currentSource.connect(audioContext.destination); currentSource.onended = playNext; currentSource.start(); }
-        function clearAudioQueue() { audioQueue = []; if (currentSource) try { currentSource.stop(); } catch(e) {} isPlaying = false; }
+        async function queueAudio(ab) { 
+            const audioBuffer = await audioContext.decodeAudioData(ab);
+            audioQueue.push(audioBuffer); 
+            if (!isPlaying) playNext(); 
+        }
 
-        async function initAudio() {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        function playNext() { 
+            if (audioQueue.length === 0) { isPlaying = false; return; } 
+            isPlaying = true; 
+            const source = audioContext.createBufferSource(); 
+            source.buffer = audioQueue.shift(); 
+            source.connect(audioContext.destination); 
+            source.onended = playNext; 
+            source.start(); 
+            currentSource = source;
+        }
+
+        function clearAudioQueue() { 
+            audioQueue = []; 
+            if (currentSource) try { currentSource.stop(); } catch(e) {} 
+            isPlaying = false; 
+        }
+
+        async function initStream() {
+            if (!window.mediaStream) {
+                window.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
             analyser = audioContext.createAnalyser();
-            const src = audioContext.createMediaStreamSource(stream);
+            const src = audioContext.createMediaStreamSource(window.mediaStream);
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             src.connect(analyser); src.connect(processor); processor.connect(audioContext.destination);
             visualize();
             processor.onaudioprocess = (e) => { 
                 if (socket && socket.readyState === 1) { 
-                    const d = e.inputBuffer.getChannelData(0); const b = new ArrayBuffer(d.length*2); const v = new DataView(b);
+                    const d = e.inputBuffer.getChannelData(0); 
+                    const b = new ArrayBuffer(d.length*2); 
+                    const v = new DataView(b);
                     for (let i=0; i<d.length; i++) v.setInt16(i*2, Math.max(-1, Math.min(1, d[i])) * (d[i]<0 ? 0x8000 : 0x7FFF), true);
                     socket.send(b);
                 }
@@ -159,13 +220,28 @@
 
         function updateUI(active) {
             isRecording = active;
-            btn.innerHTML = active ? '<i class="fas fa-stop"></i> End Session' : '<i class="fas fa-microphone"></i> Initialize Calyx';
-            btn.className = active ? "bg-slate-600 hover:bg-slate-500 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg" : "bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg";
-            statusText.innerText = active ? "Calyx Active" : "System Offline";
-            statusText.className = "text-2xl font-bold mb-1 text-white";
-            document.getElementById('sosContainer').className = active ? "mb-6" : "hidden mb-6";
-            modeIcon.classList.toggle('pulse', active);
-            document.getElementById("visContainer").children[0].classList.toggle('opacity-30', !active);
+            if (active) {
+                btn.innerHTML = '<i class="fas fa-stop"></i> End Session';
+                btn.className = "bg-slate-600 hover:bg-slate-500 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg transition-colors";
+                statusText.innerText = "Calyx Active";
+                subStatus.innerText = "Listening...";
+                statusText.className = "text-2xl font-bold mb-1 text-white";
+                document.getElementById('sosContainer').classList.remove("hidden");
+                document.getElementById('sosHint').classList.remove("hidden");
+                modeIcon.classList.add('pulse');
+                document.getElementById("visContainer").children[0].classList.remove('opacity-30');
+                downloadBtn.classList.add("hidden");
+            } else {
+                btn.innerHTML = '<i class="fas fa-microphone"></i> Initialize Calyx';
+                btn.className = "bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg transition-colors";
+                statusText.innerText = "System Offline";
+                statusText.className = "text-2xl font-bold mb-1 text-white";
+                subStatus.innerText = "Guardian Relay Inactive.";
+                modeIcon.classList.remove('pulse');
+                document.getElementById('sosContainer').classList.add("hidden");
+                document.getElementById('sosHint').classList.add("hidden");
+                document.getElementById("visContainer").children[0].classList.add('opacity-30');
+            }
         }
 
         function updateMode(mode) {
@@ -177,6 +253,7 @@
                 "CALM": ["fa-heartbeat","text-pink-400", "Medical / Calm"], 
                 "DEFAULT": ["fa-shield-alt","text-blue-400", "Calyx Active"] 
             }[mode] || ["fa-shield-alt","text-blue-400", "Calyx Active"];
+            
             icon.className = `text-6xl mb-4 transition-all duration-500 pulse ${conf[1]} mt-4`;
             icon.innerHTML = `<i class="fas ${conf[0]}"></i>`;
             statusText.className = `text-2xl font-bold mb-1 ${conf[1]}`;
@@ -187,14 +264,15 @@
             if (!isRecording) return;
             requestAnimationFrame(visualize);
             const l = analyser.frequencyBinCount; const d = new Uint8Array(l); analyser.getByteFrequencyData(d);
-            
-            // Handle retina scaling
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
+            canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             let x=0; const w=(canvas.width/l)*2.5;
-            for(let i=0; i<l; i++) { const h=(d[i]/255)*canvas.height; ctx.fillStyle=`rgb(${h+50},100,255)`; ctx.fillRect(x,canvas.height-h,w,h); x+=w+1; }
+            for(let i=0; i<l; i++) { 
+                const h=(d[i]/255)*canvas.height; 
+                ctx.fillStyle=`rgb(${h+50},100,255)`; 
+                ctx.fillRect(x,canvas.height-h,w,h); 
+                x+=w+1; 
+            }
         }
     </script>
 </body>

@@ -1,6 +1,5 @@
 import warnings
-# SUPPRESS WARNINGS MUST BE FIRST
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -10,57 +9,41 @@ import uvicorn
 import asyncio
 import json
 import os
-# Now import the brain
 from brain import DeepgramService, GroqService, MurfService, CalyxState, GuardianRelay, EvidenceVault, TwilioPhoneService, LocationStore
 
 app = FastAPI()
 
-# Mount Static for Evidence PDFs
-if not os.path.exists("static"): os.makedirs("static")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+INDEX_PATH = os.path.join(BASE_DIR, "index.html")
 
-# Global State
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 calyx_state = CalyxState()
-relay = GuardianRelay()
+relay = GuardianRelay(calyx_state) 
 vault = EvidenceVault()
 
 @app.get("/")
 async def get():
-    with open("index.html", "r") as f:
-        return HTMLResponse(content=f.read())
+    if os.path.exists(INDEX_PATH):
+        with open(INDEX_PATH, "r") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="Error: index.html not found. Check backend folder.", status_code=500)
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
-    return FileResponse(os.path.join("static", filename), filename=filename)
+    file_location = os.path.join(STATIC_DIR, filename)
+    if os.path.exists(file_location):
+        return FileResponse(file_location, filename=filename)
+    return {"error": "File not found"}
 
 @app.on_event("startup")
 async def startup_event():
-    """Generates the WAV File for the Phone Call"""
-    print(">>> [INIT] Checking Emergency Audio...")
-    temp_state = CalyxState()
-    temp_state.voice_id = "en-US-natalie"
-    temp_state.style = "Promo"
-    service = MurfService(temp_state)
-    
-    text = "This is a Calyx Emergency Alert. Your contact has triggered a Silent S O S. I have sent their location to your SMS. Please check it immediately."
-    
-    try:
-        if not os.path.exists("emergency.wav"):
-            print(">>> [INIT] Generating emergency.wav...")
-            async for audio_bytes in service.generate_phone_audio(text):
-                with open("emergency.wav", "wb") as f:
-                    f.write(audio_bytes)
-            print(">>> [INIT] Done.")
-    except Exception as e:
-        print(f">>> [INIT] Audio Generation skipped: {e}")
+    pass
 
-@app.get("/emergency.wav")
-async def get_audio():
-    if os.path.exists("emergency.wav"):
-        return FileResponse("emergency.wav", media_type="audio/wav")
-    return {"error": "File not found"}
-
-# --- WEB UI ---
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -74,10 +57,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
     async def trigger_call():
         print(">>> [MAIN] Triggering Call...")
-        # Capture context for the phone call
-        context_str = " ".join([m['content'] for m in groq_service.memory[-4:] if m['role'] == 'user'])
+        context_str = "User triggered Silent SOS."
+        if hasattr(groq_service, 'memory'):
+            recent = [m['content'] for m in groq_service.memory[-6:] if m['role'] == 'user']
+            story = [msg for msg in recent if len(msg) > 4 and "call" not in msg.lower()]
+            if story: context_str = ". ".join(story)
+            
         calyx_state.update_incident_context(context_str)
-        
         await relay.trigger_emergency_protocol()
         if websocket_open: await websocket.send_text("ALERT_SENT")
 
@@ -90,13 +76,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
     async def on_transcript(text):
         if sos_task and not sos_task.done(): sos_task.cancel()
-        
-        # Detect "Safe" or "Stop" to generate report
-        if "safe" in text.lower() or "stop" in text.lower():
+        if "safe" in text.lower() or "end session" in text.lower():
             pdf_file = vault.generate_pdf(groq_service.memory)
             await relay.send_evidence_link(pdf_file)
             if websocket_open: await websocket.send_text(f"DOWNLOAD:{pdf_file}")
-            
         await transcript_queue.put(text)
 
     try:
@@ -104,7 +87,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.close()
             return
 
-        async def receive_socket_commands():
+        async def receive_cmds():
             try:
                 while websocket_open:
                     data = await websocket.receive()
@@ -121,13 +104,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         if cmd == "TRIGGER_SOS":
                             nonlocal sos_task
                             calyx_state.update_incident_context("User tapped SOS Button.")
-                            async def text_gen(): yield "Silent SOS. Calling in 5 seconds."
-                            async for chunk in tts_service.stream_audio(text_gen()): 
-                                if websocket_open: await websocket.send_bytes(chunk)
                             sos_task = asyncio.create_task(start_sos_countdown())
             except (WebSocketDisconnect, RuntimeError): pass
 
-        async def process_conversation():
+        async def process_ai():
             nonlocal sos_task
             try:
                 while websocket_open:
@@ -135,6 +115,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     calyx_state.reset_interruption()
                     if websocket_open: await websocket.send_text("CLEAR") 
                     
+                    if "call" in user_text.lower() and "contact" in user_text.lower():
+                         await trigger_call()
+
                     text_stream = groq_service.get_streaming_response(user_text)
                     audio_stream = tts_service.stream_audio(text_stream)
                     
@@ -144,35 +127,29 @@ async def websocket_endpoint(websocket: WebSocket):
                         
                     async for chunk in audio_stream:
                         if calyx_state.interrupted: break
-                        
-                        # Handle Triggers
                         if chunk == b"SIGNAL_CALL": await trigger_call()
-                        elif b"SIGNAL_TIMER" in chunk:
+                        elif chunk == b"SIGNAL_TIMER":
                              if sos_task: sos_task.cancel()
                              sos_task = asyncio.create_task(start_sos_countdown())
                         elif websocket_open: await websocket.send_bytes(chunk)
             except (WebSocketDisconnect, RuntimeError): pass
 
-        await asyncio.wait([asyncio.create_task(receive_socket_commands()), asyncio.create_task(process_conversation())], return_when=asyncio.FIRST_COMPLETED)
+        await asyncio.wait([asyncio.create_task(receive_cmds()), asyncio.create_task(process_ai())], return_when=asyncio.FIRST_COMPLETED)
     finally:
         websocket_open = False
         await dg_service.stop()
 
-# --- TWILIO PHONE ---
 @app.websocket("/ws/twilio")
 async def twilio_endpoint(websocket: WebSocket):
     await websocket.accept()
-    
     phone_state = CalyxState()
     phone_state.incident_context = calyx_state.incident_context 
     phone_state.is_phone_call = True
-    
     dg_service = DeepgramService(phone_state)
     twilio_service = TwilioPhoneService(phone_state)
     groq_service = GroqService(phone_state)
     groq_service.set_phone_persona()
     tts_service = MurfService(phone_state)
-
     async def on_phone_transcript(sentence):
         full_text = ""
         async for chunk in groq_service.get_streaming_response(sentence): full_text += chunk
@@ -180,16 +157,13 @@ async def twilio_endpoint(websocket: WebSocket):
         async for pcm in tts_service.generate_phone_audio(full_text):
             msg = twilio_service.create_outgoing_audio_msg(pcm)
             if msg: await websocket.send_json(msg)
-
     await dg_service.start(on_phone_transcript, is_phone=True)
-
     try:
         while True:
             data = await websocket.receive_text()
             msg = json.loads(data)
             if msg['event'] == 'start':
                 twilio_service.stream_sid = msg['start']['streamSid']
-                # Speak Intro
                 intro = f"Hello. This is Calyx. An emergency has been triggered. The user reports: {phone_state.incident_context}. I sent their location to your SMS."
                 async for chunk in tts_service.generate_phone_audio(intro):
                     await websocket.send_json(twilio_service.create_outgoing_audio_msg(chunk))

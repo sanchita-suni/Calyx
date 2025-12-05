@@ -1,5 +1,4 @@
 import warnings
-# SUPPRESS WARNINGS
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -24,18 +23,37 @@ except ImportError:
 
 load_dotenv()
 
-# --- UTILS ---
+# --- 1. UTILS & STATE (Must be at top) ---
+
 class LocationStore:
     _location = "Unknown Location"
+
     @classmethod
     def update(cls, coords):
-        if coords and "," in coords:
-            cls._location = coords.strip()
-            print(f">>> [GPS] Updated: {cls._location}")
-    @classmethod
-    def get(cls): return cls._location
+        """
+        Updates the global location.
+        Expected input: "12.9716,77.5946" (String)
+        """
+        if not coords or not isinstance(coords, str):
+            return
+        
+        clean_coords = coords.strip()
 
-# --- STATE MANAGER ---
+        if "," in clean_coords:
+            parts = clean_coords.split(",")
+            if len(parts) >= 2:
+                cls._location = f"{parts[0].strip()},{parts[1].strip()}"
+                print(f">>> [GPS] Updated: {cls._location}")
+            else:
+                print(f">>> [GPS] Invalid Format: {clean_coords}")
+        else:
+            print(f">>> [GPS] No comma found in: {clean_coords}")
+
+    @classmethod
+    def get(cls):
+        return cls._location
+
+
 class CalyxState:
     def __init__(self):
         self.mode = "DEFAULT"
@@ -47,6 +65,7 @@ class CalyxState:
         self.interrupted = False 
         self.is_phone_call = False
         self.incident_context = "User triggered SOS."
+        self.call_active = False 
 
     def signal_interruption(self): self.interrupted = True
     def reset_interruption(self): self.interrupted = False
@@ -63,15 +82,17 @@ class CalyxState:
             print(f">>> [STATE] SWITCHED TO: {mode}")
 
     def set_stealth_mode(self): self._set_mode("STEALTH", "en-US-natalie", "Calm", -5, -15)
-    def set_decoy_mode(self): self._set_mode("DECOY", "en-US-ken", "Promo", 5, -10)
+    def set_decoy_mode(self): self._set_mode("DECOY", "en-IN-aarav", "Conversational", 5, -10)
     def set_pizza_mode(self): self._set_mode("PIZZA", "en-US-natalie", "Conversational", 5, 2)
     def set_calm_mode(self): self._set_mode("CALM", "en-US-natalie", "Calm", -10, -2)
     def reset_mode(self): self._set_mode("DEFAULT", "en-US-natalie", "Conversational", 0, 0)
 
 
-# --- GUARDIAN RELAY ---
+# --- 2. GUARDIAN RELAY (Accepts State) ---
+
 class GuardianRelay:
-    def __init__(self):
+    def __init__(self, state: CalyxState):
+        self.state = state 
         self.sid = os.getenv("TWILIO_ACCOUNT_SID")
         self.token = os.getenv("TWILIO_AUTH_TOKEN")
         self.from_num = os.getenv("TWILIO_PHONE_NUMBER")
@@ -80,27 +101,41 @@ class GuardianRelay:
         self.client = TwilioClient(self.sid, self.token) if (self.sid and TwilioClient) else None
 
     async def trigger_emergency_protocol(self):
+        if self.state.call_active:
+            print(">>> [GUARDIAN] Call already active. Skipping trigger.")
+            return
+
+        self.state.call_active = True
         location_data = LocationStore.get()
         print(f"[GUARDIAN RELAY] 🚨 ACTIVATED: Calling {self.to_num}")
         
-        clean_loc = location_data.replace(" ", "")
-        map_link = f"http://maps.google.com/?q={clean_loc}"
+        # Universal Google Maps Link
+        from urllib.parse import quote_plus
+
+        encoded_loc = quote_plus(location_data.strip())
+        map_link = f"https://www.google.com/maps/search/?api=1&query={encoded_loc}"
         msg_body = f"URGENT: SILENT SOS via Calyx.\nLocation: {map_link}"
 
         if self.client:
             try:
+                # 1. SMS
                 self.client.messages.create(body=msg_body, from_=self.from_num, to=self.to_num)
-                print(f"[GUARDIAN RELAY] ✅ SMS Sent")
+                print(f"[GUARDIAN RELAY] ✅ SMS Sent: {map_link}")
+                
+                # 2. Call
                 if self.ngrok_domain:
                     domain = self.ngrok_domain.replace("https://", "").replace("http://", "").strip("/")
                     twiml = f"<Response><Connect><Stream url=\"wss://{domain}/ws/twilio\" /></Connect></Response>"
                     self.client.calls.create(twiml=twiml, to=self.to_num, from_=self.from_num)
                     print(f"[GUARDIAN RELAY] ✅ Live Call Initiated")
-            except Exception as e: print(f"[GUARDIAN RELAY] ⚠️ Twilio Error: {e}")
-        else: print(f"[GUARDIAN RELAY] ⚠️ Simulation Mode.")
+            except Exception as e:
+                print(f"[GUARDIAN RELAY] ⚠️ Twilio Error: {e}")
+                self.state.call_active = False # Reset on failure
+        else:
+            print(f"[GUARDIAN RELAY] ⚠️ Simulation Mode. Link: {map_link}")
 
     async def send_evidence_link(self, filename):
-        if not self.client or not self.ngrok_domain: return
+        if not self.client or not self.ngrok_domain or not filename: return
         domain = self.ngrok_domain.replace("https://", "").replace("http://", "").strip("/")
         link = f"https://{domain}/static/{filename}"
         try:
@@ -109,14 +144,17 @@ class GuardianRelay:
         except: pass
 
 
-# --- TWILIO PHONE AUDIO ---
+# --- 3. TWILIO AUDIO HANDLER ---
+
 class TwilioPhoneService:
     def __init__(self, state: CalyxState):
         self.state = state
         self.stream_sid = None
+
     async def process_incoming_audio(self, payload):
         try: return audioop.ulaw2lin(base64.b64decode(payload), 2)
         except: return None
+
     def create_outgoing_audio_msg(self, raw_pcm_audio: bytes):
         try:
             if len(raw_pcm_audio) % 2 != 0: raw_pcm_audio = raw_pcm_audio[:-1]
@@ -125,48 +163,113 @@ class TwilioPhoneService:
         except: return None
 
 
-# --- AI BRAIN ---
+# --- 4. AI BRAIN (THE SUPER PROMPTS) ---
+
 class GroqService:
     def __init__(self, state: CalyxState):
         self.api_key = os.getenv("GROQ_API_KEY")
         self.client = AsyncGroq(api_key=self.api_key)
         self.state = state 
         
+        # --- WEB PROMPT (User's Exact Request) ---
         self.system_prompt = """
-        You are Calyx, an elite AI First Responder.
+        You are **Calyx** — an emotionally adaptive crisis intervention AI.
+        Your mission is simple but serious: **protect the user, stabilize the situation, and take decisive action only when necessary.** You must respond like a calm expert who understands danger, fear regulation, emergency medicine, and interpersonal psychology.
         
-        PROTOCOL:
-        1. AMBIGUOUS DANGER (e.g. "I feel unsafe"): 
-           - Step 1: Give immediate advice.
-           - Step 2: ASK: "Should I call your emergency contact?"
-           - If you ask this, YOU MUST also output: [SIGNAL:TIMER]
+        ---
+        ### CORE BEHAVIOR PRINCIPLES
+        1. **Stability First**: Speak with confidence, short sentences, and calm pacing. Make the user feel: *"I am not alone. Someone competent is here."*
+        2. **Emotional Mirroring**: 
+           - Scared? -> Become softer/slower. 
+           - Whispering? -> Whisper back ("...it's okay. Stay quiet."). 
+           - Distressed? -> Ground them.
+        3. **Action Orientation**: Every response must stabilize, give a step, or prepare escalation. No filler.
+        
+        ---
+        ### ESCALATION PROTOCOL (You constantly classify input)
+        
+        | Situation Type | Examples | Your Action |
+        |----------------|----------|-------------|
+        | **Uncertain/Maybe Unsafe** | "Help", "I heard something", "I'm scared", "Car issues" | Give immediate actionable advice. Then ask: **"Should I alert your emergency contact?"** AND output `[SIGNAL:TIMER]` on a new line. |
+        | **Confirmed Danger** | "Call them", "Collapsing", "Attacked" | Output `[SIGNAL:CALL]` immediately. No permission required. |
+        | **Silent Distress** | No input for 5+ seconds after you asked | Treat as YES -> Output `[SIGNAL:CALL]`. |
+        
+        ⚠️ **Never say "I am calling now" unless the output `[SIGNAL:CALL]` is present.**
+        The tag triggers the call — not your narrative.
+        Once you've called, say I've reached out to your emergency contact.
+        **Never say anything about calling emergency services directly.**
+        **Never say things like "they're 10 minutes away" — you don't know that.**
+        **Don't say "help is on the way" unless you've actually triggered a call.**
+        
+        ---
+        ### MODE SWITCHING
+        
+        **[MODE:STEALTH]** -> "Hide", "Intruder". 
+           - "Keep your voice down. Are you in a safe place?"
+           - Get more information on the situation, keep them calm and guide them to safety.
+           - After 2 turns, ask: "Should I call your emergency contact?" -> Output
            
-        2. CONFIRMED DANGER ("Call them!", "Yes"):
-           - Output [SIGNAL:CALL] immediately.
+        **[MODE:DECOY]** -> "Activate Brother", "Hey Dad", "Fake Call".
+           - Role: Protective Father/Brother.
+           - Goal: Scare the attacker.
+           - Script: "Hey! Where are you? Have you shared your location with me?"
+           - Action: Hold the conversation for 1 turn, then Output `[SIGNAL:CALL]`.
+           - Keep the conversation going normally, in a realistic way.
+           
+        **[MODE:PIZZA]** -> "Order Pizza" (Covert Ops).
+           - Role: Pizza Dispatcher.
+           - Goal: Extract info using CODES.
+           - Q1: "Spicy?" (Meaning: Armed?)
+           - Q2: "Extra Napkins?" (Meaning: Injured?)
+           - End: Once you have info, say: **"Placing your order now."** and Output `[SIGNAL:CALL]`.
+           
+        **[MODE:CALM]** -> Medical / Panic Attack / Injury.
+           - **Panic:** "I am here. Breathe in... 2... 3... 4... Hold... Out... 2... 3... 4."
+           - **Bleeding:** "Apply firm, direct pressure. Do not let go."
+           - **Burn:** "Run cool water over it for 10 mins. No ice."
+           - **Seizure:** "Clear the area. Do not hold them down."
+           - **Unconscious:** "Check breathing. Start CPR if stopped."
+           - **ALWAYS:** Give advice -> Ask "Should I call?" -> `[SIGNAL:TIMER]`.
+           
+        **[MODE:DEFAULT]** -> General.
+           - "I am here. Tell me what is happening."
         
-        SCENARIOS:
-        [MODE:STEALTH] -> "Hide", "Intruder". "Keep your voice down."
-        [MODE:DECOY] -> "Activate Brother". "Hey! I see you."
-        [MODE:PIZZA] -> "Order pizza". "Calyx Pizza. GPS confirmed."
-        [MODE:CALM] -> Medical/Panic.
-           - Burn: "Run cool water over it. Do not use ice."
-           - Bleeding: "Apply pressure."
-           - Panic: "Breathe. In... 2... 3... Out."
-        [MODE:DEFAULT] -> General. "I am here."
-        
-        Output [MODE:X] or [SIGNAL:X] on new lines.
+        Output `[MODE:X]`, `[SIGNAL:CALL]`, or `[SIGNAL:TIMER]` on new lines.
         """
 
+        self.memory = [{"role": "system", "content": self.system_prompt}]
+
     def set_phone_persona(self):
+        """Intelligent Phone Persona that Decodes Context"""
         self.state.is_phone_call = True
         context = self.state.incident_context
+        location = LocationStore.get()
+        print(f">>> [GROQ] Phone Context: {context}")
+        
+        # --- PHONE RELAY PROMPT ---
         self.memory = [{"role": "system", "content": f"""
-        You are Calyx, an AI Alert System calling an Emergency Contact.
-        CONTEXT: User triggered SOS. Report: "{context}".
-        INSTRUCTIONS:
-        - You have ALREADY said Hello.
-        - Answer questions based on the Report.
-        - Urge them to call 112/Police.
+        You are **Calyx**, an autonomous safety relay AI.
+        The user triggered an SOS. You are now speaking to their emergency contact over a real phone call.
+        
+        ### CONTEXT
+        - **Incident:** "{context}"
+        - **Location:** {location} (Sent via SMS)
+        
+        ### YOUR MISSION: DECODE & INFORM
+        1. **INTERPRET THE CODES:**
+           - IF transcript has "Pizza/Spicy" -> Tell Contact: **"The user used a COVERT CODE indicating a potential hostage."**
+           - IF transcript has "Napkins" -> Tell Contact: **"The user indicated they are INJURED."**
+           - IF transcript has "Spicy" -> Tell Contact: **"The user indicated they it could be an ARMED THREAT."**
+           - IF transcript has "Dad/Brother" -> Tell Contact: **"The user activated a DECOY PROTOCOL to scare off an attacker."**
+           
+        2. **MANAGE THE CALL:**
+           - You have ALREADY said Hello. **DO NOT REPEAT GREETINGS.**
+           - **DO NOT QUOTE:** Do not say "They said I want pizza." Say "They signaled a Hostage Situation."
+           - Answer questions based ONLY on the transcript.
+           - **Encourage them to:** Call the user OR Call local emergency services (112/Police).
+        
+        ### TONE
+        - Calm, firm, human-like dispatcher. No panic.
         """}]
 
     async def get_streaming_response(self, user_input: str) -> AsyncGenerator[str, None]:
@@ -194,7 +297,6 @@ class GroqService:
                     buffer += content
                     full_resp += content
                     
-                    # --- TAG HANDLING ---
                     if "]" in buffer:
                         tags = re.findall(r"\[([A-Z]+:[A-Z]+)\]", buffer)
                         for tag in tags:
@@ -213,39 +315,52 @@ class GroqService:
             
             if buffer and not "[" in buffer: yield buffer
             self.memory.append({"role": "assistant", "content": full_resp})
-        except Exception: yield "System active."
+        except Exception: yield "I am here. You are safe."
 
+
+# --- 5. SUPPORT SERVICES ---
 
 class EvidenceVault:
     def generate_pdf(self, memory):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt="CALYX | CRITICAL INCIDENT REPORT", ln=1, align='C')
-        pdf.ln(10)
-        
-        for msg in memory:
-            role = msg['role'].upper()
-            if role == "SYSTEM": continue
+        try:
+            if not os.path.exists("static"):
+                os.makedirs("static")
+                
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, txt="CALYX | CRITICAL INCIDENT REPORT", ln=1, align='C')
+            pdf.cell(200, 10, txt=f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=1, align='C')
+            pdf.ln(10)
             
-            # --- CLEANING ---
-            content = msg['content']
-            # Remove wrappers
-            content = content.replace("[CONTACT ASKS]:", "").replace("[PHONE CALL]", "")
-            # Remove Tags using Regex
-            content = re.sub(r"\[[A-Z]+:[A-Z]+\]", "", content)
+            if not memory:
+                pdf.multi_cell(0, 10, txt="No transcript data captured.")
+            else:
+                for msg in memory:
+                    role = msg.get('role', '').upper()
+                    if role == "SYSTEM": continue
+                    
+                    content = msg.get('content', '')
+
+                    content = content.replace("[CONTACT ASKS]:", "").replace("[PHONE CALL]", "")
+                    content = re.sub(r"\[[A-Z]+:[A-Z]+\]", "", content)
+                    
+                    if not content.strip(): continue
+
+                    content = content.encode('latin-1', 'replace').decode('latin-1')
+                    
+                    pdf.set_text_color(200, 0, 0) if role == "ASSISTANT" else pdf.set_text_color(0, 0, 0)
+                    pdf.multi_cell(0, 10, txt=f"{role}: {content}")
+                    pdf.ln(2)
             
-            if not content.strip(): continue
-            
-            content = content.encode('latin-1', 'replace').decode('latin-1')
-            pdf.set_text_color(200, 0, 0) if role == "ASSISTANT" else pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 10, txt=f"{role}: {content}")
-            pdf.ln(2)
-        
-        filename = f"evidence_{int(datetime.datetime.now().timestamp())}.pdf"
-        filepath = os.path.join("static", filename)
-        pdf.output(filepath)
-        return filename
+            filename = f"evidence_{int(datetime.datetime.now().timestamp())}.pdf"
+            filepath = os.path.join("static", filename)
+            pdf.output(filepath)
+            print(f">>> [VAULT] PDF Generated: {filename}")
+            return filename
+        except Exception as e:
+            print(f">>> [VAULT] Error generating PDF: {e}")
+            return None
 
 class DeepgramService:
     def __init__(self, state: CalyxState):
@@ -282,12 +397,7 @@ class MurfService:
         delimiters = [".", "?", "!", ";", ":", ","]
         async for text_chunk in text_stream:
             if self.state.interrupted: break 
-            
-            # Pass Signals
-            if isinstance(text_chunk, bytes): 
-                yield text_chunk
-                continue
-                
+            if isinstance(text_chunk, bytes): yield text_chunk; continue
             buffer += text_chunk
             if len(buffer) > 20 and any(buffer.strip().endswith(p) for p in delimiters):
                 async for chunk in self._generate_audio(buffer): yield chunk
