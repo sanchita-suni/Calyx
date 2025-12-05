@@ -46,11 +46,11 @@ Backend: Python(FastAPI) - Asynchronous WebSocket server handling audio streams.
 4. Bridge: The phone call connects to the same AI brain, allowing the Emergency Contact to ask questions ("Is she hurt?") which the AI answers based on the user's context.
 
 🛠️ Installation & Setup
-1. Clone the Repository
-   git clone https://github.com/yourusername/calyx-voice-agent.git
+1. Clone the Repository:
+   git clone https://github.com/yourusername/calyx-voice-agent.git ;
    cd calyx-voice-agent
 
-2. Install Dependencies
+2. Install Dependencies:
    pip install -r requirements.txt
 
 3. Configure Environment Variables Create a .env file in the root directory:
