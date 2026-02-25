@@ -1,0 +1,16 @@
+# Environments
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Generated evidence reports
+static/evidence_*.pdf
+
+# Audio artifacts
+*.wav
+*.mp3

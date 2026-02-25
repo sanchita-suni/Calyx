@@ -3,275 +3,1332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Calyx | Murf Falcon Safety Agent</title>
+    <title>Calyx | Your Safety Companion</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #0f172a; color: white; font-family: 'Inter', sans-serif; touch-action: manipulation; }
-        .pulse { animation: pulse-animation 2s infinite; }
-        @keyframes pulse-animation { 0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.7); } 100% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); } }
-        .sos-pulse { animation: sos-animation 1s infinite; }
-        @keyframes sos-animation { 0% { box-shadow: 0 0 0 0px rgba(220, 38, 38, 0.7); } 100% { box-shadow: 0 0 0 30px rgba(220, 38, 38, 0); } }
-        .alert-toast { position: fixed; top: 20px; right: 20px; background: #22c55e; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.5s; z-index: 50; font-weight: bold; }
-        .show-toast { opacity: 1; }
-        .brand-text { background: linear-gradient(to right, #60a5fa, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --danger: #ef4444;
+            --danger-dark: #dc2626;
+            --success: #10b981;
+            --bg-dark: #0a0a12;
+            --bg-card: #12121f;
+            --bg-input: #1a1a2e;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #2d2d4a;
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.08) 0%, transparent 50%);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow: hidden;
+            transition: background 0.5s ease, background-image 0.5s ease;
+        }
+
+        /* Mode-based backgrounds */
+        body.mode-default {
+            background: var(--bg-dark);
+            background-image: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.08) 0%, transparent 50%);
+        }
+        body.mode-stealth {
+            background: #050508;
+            background-image: radial-gradient(ellipse at top, rgba(30, 30, 40, 0.3) 0%, transparent 50%);
+        }
+        body.mode-covert {
+            background: #0a0a12;
+            background-image: radial-gradient(ellipse at top, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
+        }
+        body.mode-urgent {
+            background: #120a0a;
+            background-image: radial-gradient(ellipse at top, rgba(239, 68, 68, 0.15) 0%, transparent 50%);
+        }
+        body.mode-calm {
+            background: #0a100a;
+            background-image: radial-gradient(ellipse at top, rgba(34, 197, 94, 0.1) 0%, transparent 50%);
+        }
+        body.mode-medical {
+            background: #0a0f12;
+            background-image: radial-gradient(ellipse at top, rgba(59, 130, 246, 0.12) 0%, transparent 50%);
+        }
+        body.mode-decoy {
+            background: #0f0a12;
+            background-image: radial-gradient(ellipse at top, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+
+        @keyframes recording-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes typing {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes countdown {
+            from { stroke-dashoffset: 0; }
+            to { stroke-dashoffset: 283; }
+        }
+
+        @keyframes call-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Giant Speak Button */
+        .speak-button {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .speak-button::before {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            background: var(--primary);
+            opacity: 0;
+            z-index: -1;
+        }
+
+        .speak-button:hover { transform: scale(1.05); }
+        .speak-button:active { transform: scale(0.95); }
+
+        .speak-button.recording {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            box-shadow: 0 10px 40px rgba(34, 197, 94, 0.4);
+            animation: recording-pulse 1.5s ease-in-out infinite;
+        }
+
+        .speak-button.recording::before {
+            animation: pulse-ring 1.5s ease-out infinite;
+            opacity: 0.5;
+            background: #22c55e;
+        }
+
+        /* SOS Button */
+        .sos-button {
+            background: linear-gradient(135deg, var(--danger) 0%, var(--danger-dark) 100%);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .sos-button::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            background: var(--danger);
+            border-radius: inherit;
+            opacity: 0;
+            z-index: -1;
+            animation: pulse-ring 2s ease-out infinite;
+        }
+
+        .sos-button:hover::before { opacity: 0.4; }
+        .sos-button:active { transform: scale(0.97); }
+
+        /* Mode badges */
+        .mode-badge { transition: all 0.3s ease; }
+        .mode-default { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+        .mode-stealth { background: linear-gradient(135deg, #475569, #334155); }
+        .mode-decoy { background: linear-gradient(135deg, #f97316, #ea580c); }
+        .mode-covert { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .mode-calm { background: linear-gradient(135deg, #06b6d4, #0891b2); }
+        .mode-medical { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .mode-urgent { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+        /* Chat bubbles */
+        .chat-bubble {
+            max-width: 85%;
+            word-wrap: break-word;
+            animation: slideUp 0.2s ease-out;
+        }
+
+        .chat-bubble.user {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 20px 20px 4px 20px;
+            margin-left: auto;
+        }
+
+        .chat-bubble.ai {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 20px 20px 20px 4px;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Toggle */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: var(--bg-input);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid var(--border);
+        }
+        .toggle-switch.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        .toggle-switch.active::after { left: calc(100% - 20px); }
+
+        /* Input */
+        .chat-input {
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            transition: all 0.2s ease;
+        }
+        .chat-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            outline: none;
+        }
+
+        /* Status */
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .status-indicator.connected { background: var(--success); box-shadow: 0 0 10px var(--success); }
+        .status-indicator.disconnected { background: var(--text-secondary); }
+        .status-indicator.recording { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+
+        /* Timer overlay */
+        .timer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .timer-circle { width: 140px; height: 140px; }
+        .timer-circle circle {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: center;
+        }
+        .timer-circle .bg { stroke: var(--border); }
+        .timer-circle .progress {
+            stroke: var(--danger);
+            stroke-dasharray: 283;
+            animation: countdown 5s linear forwards;
+        }
+
+        /* Glass header */
+        .glass {
+            background: rgba(18, 18, 31, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* Visualizer */
+        .visualizer-bar {
+            background: linear-gradient(to top, var(--primary), #818cf8);
+            border-radius: 3px;
+            transition: height 0.05s ease;
+        }
+
+        /* Quick actions */
+        .quick-action {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .quick-action:hover {
+            background: var(--bg-input);
+            border-color: var(--primary);
+        }
+
+        /* Scenario cards */
+        .scenario-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .scenario-card:hover {
+            border-color: var(--primary);
+            background: var(--bg-input);
+        }
+
+        /* Contact card */
+        .contact-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Latency meter */
+        .latency-meter {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .latency-good { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .latency-ok { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+        .latency-bad { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+        /* Covert screens */
+        .covert-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            display: none;
+        }
+        .covert-overlay.active { display: flex; }
+
+        /* Fake call screen */
+        .fake-call-screen {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a12 100%);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .fake-call-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+            animation: call-pulse 2s ease-in-out infinite;
+        }
+
+        /* Fake chat screen */
+        .fake-chat-screen {
+            background: var(--bg-dark);
+            flex-direction: column;
+        }
+
+        /* Back button (covert exit) */
+        .covert-back-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            cursor: pointer;
+            z-index: 210;
+        }
+
+        @media (max-width: 640px) {
+            .speak-button { width: 120px; height: 120px; }
+        }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center h-screen p-4 overflow-hidden relative">
-    
-    <div class="absolute top-6 left-6">
-        <h1 class="text-3xl font-black tracking-widest brand-text">CALYX</h1>
-    </div>
-
-    <div id="toast" class="alert-toast">Alert Sent!</div>
-
-    <div class="bg-slate-800 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center border border-slate-700 relative overflow-hidden flex flex-col items-center">
-        
-        <div id="modeIcon" class="text-6xl mb-4 text-blue-400 transition-all duration-500 mt-6">
-            <i class="fas fa-shield-alt"></i>
+<body class="flex flex-col h-screen h-[100dvh]">
+    <!-- Covert Mode: Fake Call Screen -->
+    <div id="fakeCallScreen" class="covert-overlay fake-call-screen">
+        <button onclick="exitCovertMode()" class="covert-back-btn">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="fake-call-avatar mb-6">
+            <i class="fas fa-user"></i>
         </div>
-
-        <h1 id="statusText" class="text-2xl font-bold mb-1 text-white">System Offline</h1>
-        <p id="subStatus" class="text-gray-400 text-xs mb-6 font-mono">Guardian Relay Inactive.</p>
-
-        <div id="sosContainer" class="hidden mb-6 w-full flex justify-center">
-            <button id="sosBtn" class="bg-red-600 active:bg-red-800 text-white font-bold h-28 w-28 rounded-full shadow-2xl text-xs flex flex-col items-center justify-center gap-1 border-4 border-red-800 transition-transform active:scale-95">
-                <i class="fas fa-exclamation-triangle text-3xl mb-1"></i>
-                SILENT SOS
+        <h2 id="fakeCallerName" class="text-2xl font-bold mb-2">Mom</h2>
+        <p class="text-gray-400 mb-8">Incoming call...</p>
+        <div class="flex gap-8">
+            <button class="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center" onclick="exitCovertMode()">
+                <i class="fas fa-phone-slash text-xl text-white"></i>
+            </button>
+            <button class="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center">
+                <i class="fas fa-phone text-xl text-white"></i>
             </button>
         </div>
-        <p id="sosHint" class="hidden text-xs text-red-400 mb-4 animate-pulse">Tap to call Emergency Contact silently</p>
+    </div>
 
-        <div id="visContainer" class="bg-slate-900 rounded-xl mb-6 w-full h-24 border border-slate-700 overflow-hidden relative">
-            <canvas id="visualizer" class="w-full h-full opacity-30"></canvas>
+    <!-- Covert Mode: Fake Chat Screen -->
+    <div id="fakeChatScreen" class="covert-overlay fake-chat-screen">
+        <button onclick="exitCovertMode()" class="covert-back-btn">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="glass border-b border-white/10 px-4 py-3 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center">
+                <span class="text-white font-bold">S</span>
+            </div>
+            <div>
+                <h3 class="font-semibold">Sarah</h3>
+                <p class="text-xs text-gray-400">online</p>
+            </div>
+        </div>
+        <div class="flex-1 p-4 space-y-3 overflow-y-auto">
+            <div class="flex justify-start">
+                <div class="bg-white/10 rounded-2xl px-4 py-2 max-w-[70%]">
+                    <p class="text-sm">Hey! Are you coming to the party tonight?</p>
+                    <p class="text-[10px] text-gray-500 mt-1">2:34 PM</p>
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <div class="bg-indigo-600 rounded-2xl px-4 py-2 max-w-[70%]">
+                    <p class="text-sm">Maybe! What time does it start?</p>
+                    <p class="text-[10px] text-indigo-300 mt-1">2:36 PM</p>
+                </div>
+            </div>
+            <div class="flex justify-start">
+                <div class="bg-white/10 rounded-2xl px-4 py-2 max-w-[70%]">
+                    <p class="text-sm">Around 8pm. Let me know!</p>
+                    <p class="text-[10px] text-gray-500 mt-1">2:37 PM</p>
+                </div>
+            </div>
+        </div>
+        <div class="p-4 border-t border-white/10">
+            <div class="flex gap-2">
+                <input type="text" placeholder="Type a message..." class="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none">
+                <button class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center">
+                    <i class="fas fa-paper-plane text-white"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timer Overlay -->
+    <div id="timerOverlay" class="timer-overlay hidden">
+        <svg class="timer-circle mb-6">
+            <circle class="bg" cx="70" cy="70" r="45"></circle>
+            <circle class="progress" cx="70" cy="70" r="45"></circle>
+        </svg>
+        <p id="timerText" class="text-5xl font-bold text-white mb-2">5</p>
+        <p class="text-gray-400 mb-8">Calling emergency contact...</p>
+        <button onclick="cancelTimer()" class="px-10 py-4 bg-white/10 hover:bg-white/20 rounded-full text-white font-semibold text-lg transition-all">
+            <i class="fas fa-times mr-2"></i>Cancel
+        </button>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-end sm:items-center justify-center">
+        <div class="bg-[#12121f] w-full max-w-md rounded-t-3xl sm:rounded-3xl max-h-[85vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Settings</h2>
+                    <button onclick="closeSettings()" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Your Name -->
+                <div class="mb-6">
+                    <label class="text-sm text-gray-400 mb-2 block">Your Name</label>
+                    <input id="userName" type="text" placeholder="Enter your name"
+                        class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <!-- Emergency Contacts -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-sm text-gray-400">Emergency Contacts</label>
+                        <button onclick="addContactField()" class="text-indigo-400 text-sm hover:text-indigo-300">
+                            <i class="fas fa-plus mr-1"></i>Add
+                        </button>
+                    </div>
+                    <div id="contactsList" class="space-y-2">
+                        <!-- Contact fields added dynamically -->
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">First contact will receive AI call. Others get SMS + automated message.</p>
+                </div>
+
+                <!-- Save Button -->
+                <button onclick="saveSettings()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-semibold transition-all">
+                    <i class="fas fa-check mr-2"></i>Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="glass border-b border-white/10 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-shield-halved text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg">Calyx</h1>
+                <div class="flex items-center gap-2 text-xs text-gray-400">
+                    <span id="statusIndicator" class="status-indicator disconnected"></span>
+                    <span id="statusText">Tap mic to start</span>
+                    <span id="latencyMeter" class="latency-meter latency-good hidden">--ms</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <div id="modeBadge" class="mode-badge mode-default px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2">
+                <i id="modeIcon" class="fas fa-shield"></i>
+                <span id="modeText">Ready</span>
+            </div>
+            <button onclick="openSettings()" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center">
+                <i class="fas fa-cog text-gray-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Chat Area -->
+        <div id="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <!-- Welcome Screen -->
+            <div class="flex flex-col items-center justify-center h-full text-center px-4" id="welcomeScreen">
+                <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-600/20 flex items-center justify-center mb-4">
+                    <i class="fas fa-shield-halved text-3xl text-indigo-400"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-2">Your Safety Companion</h2>
+                <p class="text-gray-400 text-sm mb-6 max-w-xs">
+                    Speak or type. I handle emergencies, panic attacks, stalking, and more.
+                </p>
+
+                <!-- Scenario quick picks -->
+                <div class="grid grid-cols-2 gap-2 w-full max-w-sm mb-6">
+                    <div class="scenario-card" onclick="quickScenario('Someone is following me')">
+                        <i class="fas fa-eye text-amber-400 mb-1"></i>
+                        <div class="text-xs font-medium">Being Followed</div>
+                    </div>
+                    <div class="scenario-card" onclick="quickScenario('I think someone is in my house')">
+                        <i class="fas fa-house-crack text-red-400 mb-1"></i>
+                        <div class="text-xs font-medium">Home Intrusion</div>
+                    </div>
+                    <div class="scenario-card" onclick="quickScenario('Im having a panic attack')">
+                        <i class="fas fa-heart-pulse text-cyan-400 mb-1"></i>
+                        <div class="text-xs font-medium">Panic Attack</div>
+                    </div>
+                    <div class="scenario-card" onclick="quickScenario('pretend to be my brother')">
+                        <i class="fas fa-user-shield text-orange-400 mb-1"></i>
+                        <div class="text-xs font-medium">Decoy Call</div>
+                    </div>
+                </div>
+
+                <!-- Setup prompt -->
+                <button onclick="openSettings()" class="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-sm border border-white/10 transition-all">
+                    <i class="fas fa-cog mr-2 text-indigo-400"></i>Set up your profile
+                </button>
+            </div>
         </div>
 
-        <button id="toggleBtn" class="bg-blue-600 active:bg-blue-700 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg transition-colors">
-            <i class="fas fa-microphone"></i> Initialize Calyx
-        </button>
+        <!-- Typing Indicator -->
+        <div id="typingIndicator" class="hidden px-4 pb-2">
+            <div class="chat-bubble ai px-4 py-3 inline-block">
+                <div class="typing-indicator"><span></span><span></span><span></span></div>
+            </div>
+        </div>
 
-        <a id="downloadBtn" href="#" download class="hidden mt-4 text-blue-400 text-sm underline hover:text-blue-300">
-            <i class="fas fa-file-pdf mr-1"></i> Download Evidence Report
-        </a>
+        <!-- Audio Visualizer -->
+        <div id="visualizerContainer" class="hidden px-4 py-2 bg-black/20">
+            <div id="visualizer" class="flex items-end justify-center gap-1 h-10"></div>
+        </div>
+
+        <!-- Quick Actions (when connected) -->
+        <div id="quickActions" class="hidden px-4 py-2 flex gap-2 overflow-x-auto">
+            <button onclick="sendQuickMessage('I need help')" class="quick-action px-4 py-2 rounded-full text-sm">
+                <i class="fas fa-exclamation-circle mr-2 text-red-400"></i>Need help
+            </button>
+            <button onclick="activateCovertMode()" class="quick-action px-4 py-2 rounded-full text-sm">
+                <i class="fas fa-mask mr-2 text-purple-400"></i>Covert
+            </button>
+            <button onclick="sendQuickMessage('pretend to be my brother')" class="quick-action px-4 py-2 rounded-full text-sm">
+                <i class="fas fa-user-shield mr-2 text-orange-400"></i>Decoy
+            </button>
+        </div>
+    </main>
+
+    <!-- Bottom Control Area -->
+    <div class="p-4 pt-2 bg-gradient-to-t from-black/40 to-transparent">
+        <!-- Controls Row -->
+        <div class="flex items-center justify-between mb-4">
+            <button onclick="toggleSilentMode()" class="flex items-center gap-2 text-sm">
+                <div id="silentToggle" class="toggle-switch"></div>
+                <span class="text-gray-400">Silent Mode</span>
+            </button>
+            <div class="flex items-center gap-3">
+                <button id="downloadBtn" onclick="downloadEvidence()" class="hidden text-xs text-emerald-400 hover:text-emerald-300 px-3 py-1.5 bg-emerald-500/10 rounded-lg">
+                    <i class="fas fa-download mr-1"></i>Evidence
+                </button>
+                <button id="endSessionBtn" onclick="endSession()" class="hidden text-xs text-gray-500 hover:text-gray-300">
+                    <i class="fas fa-file-pdf mr-1"></i>End & Save
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Controls -->
+        <div class="flex items-center gap-4">
+            <!-- Text Input -->
+            <div class="flex-1 relative">
+                <input id="chatInput" type="text" placeholder="Type a message..."
+                    class="chat-input w-full px-4 py-3.5 pr-12 rounded-2xl text-sm"
+                    onkeydown="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()" class="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400 hover:text-indigo-300">
+                    <i class="fas fa-paper-plane text-lg"></i>
+                </button>
+            </div>
+
+            <!-- BIG Speak Button -->
+            <button id="speakButton" onclick="toggleSystem()" class="speak-button flex-shrink-0 flex items-center justify-center">
+                <i id="speakIcon" class="fas fa-microphone text-4xl text-white"></i>
+            </button>
+        </div>
+
+        <!-- SOS Button -->
+        <button onclick="triggerSOS()" class="sos-button w-full mt-4 py-4 rounded-2xl font-bold text-white flex items-center justify-center gap-3 text-lg">
+            <i class="fas fa-phone-volume"></i>
+            <span>Emergency SOS</span>
+        </button>
+    </div>
+
+    <!-- Download Toast -->
+    <div id="downloadToast" class="fixed bottom-32 left-4 right-4 bg-emerald-600 text-white p-4 rounded-2xl shadow-lg hidden z-50">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-file-pdf text-2xl"></i>
+                <div>
+                    <p class="font-semibold">Report Ready</p>
+                    <p class="text-sm opacity-80">Download transcript</p>
+                </div>
+            </div>
+            <button onclick="downloadEvidence()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl">
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
     </div>
 
     <script>
-        let socket;
-        let audioContext;
-        let analyser;
+        // State
+        let socket = null;
+        let audioCtx = null;
+        let isConnected = false;
         let isRecording = false;
+        let silentMode = false;
+        let currentMode = 'DEFAULT';
+        let evidenceFile = null;
+        let analyser = null;
+        let dataArray = null;
+        let timerInterval = null;
         let audioQueue = [];
         let isPlaying = false;
         let currentSource = null;
+        let covertModeActive = false;
+        let avgLatency = 0;
 
-        const btn = document.getElementById('toggleBtn');
-        const sosBtn = document.getElementById('sosBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
+        // Load saved settings
+        let userName = localStorage.getItem('userName') || '';
+        let contacts = JSON.parse(localStorage.getItem('contacts') || '[]');
+
+        // DOM
+        const chatContainer = document.getElementById('chatContainer');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const chatInput = document.getElementById('chatInput');
+        const speakButton = document.getElementById('speakButton');
+        const speakIcon = document.getElementById('speakIcon');
+        const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
-        const subStatus = document.getElementById('subStatus');
+        const modeBadge = document.getElementById('modeBadge');
         const modeIcon = document.getElementById('modeIcon');
-        const toast = document.getElementById("toast");
-        const canvas = document.getElementById("visualizer");
-        const ctx = canvas.getContext("2d");
+        const modeText = document.getElementById('modeText');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const quickActions = document.getElementById('quickActions');
+        const visualizerContainer = document.getElementById('visualizerContainer');
+        const visualizer = document.getElementById('visualizer');
+        const silentToggle = document.getElementById('silentToggle');
+        const timerOverlay = document.getElementById('timerOverlay');
+        const timerTextEl = document.getElementById('timerText');
+        const endSessionBtn = document.getElementById('endSessionBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadToast = document.getElementById('downloadToast');
+        const latencyMeter = document.getElementById('latencyMeter');
+        const settingsModal = document.getElementById('settingsModal');
+        const fakeCallScreen = document.getElementById('fakeCallScreen');
+        const fakeChatScreen = document.getElementById('fakeChatScreen');
 
-        btn.onclick = async () => { if (!isRecording) await startConnection(); else endSession(); };
-        
-        sosBtn.onclick = () => { 
-            if(socket && socket.readyState === WebSocket.OPEN) { 
-                socket.send("TRIGGER_SOS"); 
-                sosBtn.classList.add("sos-pulse");
-                subStatus.innerText = "Calling Emergency Contact...";
-                statusText.innerText = "SILENT ALARM";
-                statusText.classList.add("text-red-500");
-            } 
-        };
-
-        function showToast(msg) {
-            toast.innerText = msg;
-            toast.classList.add("show-toast");
-            setTimeout(() => toast.classList.remove("show-toast"), 4000);
+        // Create visualizer bars
+        for (let i = 0; i < 24; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'visualizer-bar w-2';
+            bar.style.height = '4px';
+            visualizer.appendChild(bar);
         }
 
-        async function startConnection() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-            } else if (audioContext.state === 'suspended') {
-                await audioContext.resume();
+        // Store last known location - try to load from localStorage first
+        let lastKnownCoords = localStorage.getItem('lastKnownCoords') || null;
+        let locationReady = false;
+
+        // Request location permission early and cache it
+        function initLocationTracking() {
+            console.log('[GPS] Initializing location tracking...');
+            if (lastKnownCoords) {
+                console.log('[GPS] Loaded cached location from storage:', lastKnownCoords);
             }
 
-            const wsUrl = "ws://localhost:8000/ws/chat";
-            
-            socket = new WebSocket(wsUrl);
-            socket.binaryType = 'arraybuffer';
-            
-            socket.onopen = async () => { 
-                updateUI(true); 
-                await initStream();
-
-                setTimeout(sendLocation, 1500);
-            };
-            
-            socket.onmessage = async (event) => {
-                const data = event.data;
-                if (typeof data === "string") {
-                    if (data.startsWith("MODE:")) updateMode(data.split(":")[1]);
-                    if (data === "CLEAR") clearAudioQueue();
-                    
-                    if (data === "ALERT_SENT") { 
-                        showToast("Contact Notified!"); 
-                        sosBtn.classList.remove("sos-pulse");
-                        statusText.innerText = "HELP ON WAY";
-                        statusText.className = "text-2xl font-bold mb-1 text-green-400";
-                    }
-                    
-                    if (data.startsWith("DOWNLOAD:")) { 
-                        showToast("Evidence Secure.");
-                        const link = "/static/" + data.split(":")[1];
-                        downloadBtn.href = link;
-                        downloadBtn.classList.remove("hidden");
-                        stopConnection(); 
-                    }
-                } else {
-                    queueAudio(data);
+            if (navigator.geolocation) {
+                // Get initial position with retry
+                function getInitialLocation(attempt = 1) {
+                    console.log(`[GPS] Getting HIGH ACCURACY location (attempt ${attempt})...`);
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            const accuracy = pos.coords.accuracy;
+                            // Only accept if accuracy is reasonable (under 100m)
+                            if (accuracy <= 100 || attempt >= 3) {
+                                lastKnownCoords = `${pos.coords.latitude},${pos.coords.longitude}`;
+                                localStorage.setItem('lastKnownCoords', lastKnownCoords);
+                                locationReady = true;
+                                console.log('[GPS] Location captured:', lastKnownCoords, `(accuracy: ${accuracy}m)`);
+                                // Send to server immediately if connected
+                                if (socket?.readyState === WebSocket.OPEN) {
+                                    socket.send(JSON.stringify({ type: 'location', coords: lastKnownCoords }));
+                                }
+                            } else {
+                                console.log(`[GPS] Accuracy ${accuracy}m too low, retrying...`);
+                                if (attempt < 3) {
+                                    setTimeout(() => getInitialLocation(attempt + 1), 1500);
+                                }
+                            }
+                        },
+                        (err) => {
+                            console.warn('[GPS] Location attempt', attempt, 'failed:', err.code, err.message);
+                            if (attempt < 3) {
+                                setTimeout(() => getInitialLocation(attempt + 1), 2000);
+                            }
+                        },
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                    );
                 }
-            };
-            socket.onclose = () => stopConnection();
-            socket.onerror = (e) => { console.error(e); stopConnection(); };
-        }
+                getInitialLocation();
 
-        function endSession() {
-            if(socket && socket.readyState === WebSocket.OPEN) {
-                socket.send("END_SESSION");
-                showToast("Generating Report...");
-                statusText.innerText = "Saving...";
+                // Watch for location changes - ALWAYS HIGH ACCURACY, NO CACHE
+                navigator.geolocation.watchPosition(
+                    (pos) => {
+                        const accuracy = pos.coords.accuracy;
+                        // Only update if accuracy improved or it's the first reading
+                        lastKnownCoords = `${pos.coords.latitude},${pos.coords.longitude}`;
+                        localStorage.setItem('lastKnownCoords', lastKnownCoords);
+                        locationReady = true;
+                        console.log('[GPS] Location updated:', lastKnownCoords, `(accuracy: ${accuracy}m)`);
+                        // Send to server if connected
+                        if (socket?.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({ type: 'location', coords: lastKnownCoords }));
+                        }
+                    },
+                    (err) => {
+                        console.warn('[GPS] Watch error:', err.code, err.message);
+                    },
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                );
             } else {
-                stopConnection();
+                console.error('[GPS] Geolocation not supported');
             }
         }
 
-        function stopConnection() { 
-            if (socket) socket.close(); 
-            updateUI(false); 
-            isRecording = false; 
-        }
-        
-        let locationSent = false;
+        // Start location tracking on page load
+        initLocationTracking();
 
-        function sendLocation() {
-            if (locationSent || !navigator.geolocation) return;
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    const loc = `LOC:${latitude},${longitude}`;
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(loc);
-                        console.log("📍 Location sent:", loc);
-                        locationSent = true;
-                    }
-                },
-                (err) => console.log("❌ GPS Error:", err),
-                { enableHighAccuracy: true, timeout: 7000 }
-            );
+        // Settings functions
+        function openSettings() {
+            settingsModal.classList.remove('hidden');
+            document.getElementById('userName').value = userName;
+            renderContactsList();
         }
 
-        async function queueAudio(ab) { 
-            const audioBuffer = await audioContext.decodeAudioData(ab);
-            audioQueue.push(audioBuffer); 
-            if (!isPlaying) playNext(); 
+        function closeSettings() {
+            settingsModal.classList.add('hidden');
         }
 
-        function playNext() { 
-            if (audioQueue.length === 0) { isPlaying = false; return; } 
-            isPlaying = true; 
-            const source = audioContext.createBufferSource(); 
-            source.buffer = audioQueue.shift(); 
-            source.connect(audioContext.destination); 
-            source.onended = playNext; 
-            source.start(); 
-            currentSource = source;
-        }
+        function renderContactsList() {
+            const list = document.getElementById('contactsList');
+            list.innerHTML = '';
 
-        function clearAudioQueue() { 
-            audioQueue = []; 
-            if (currentSource) try { currentSource.stop(); } catch(e) {} 
-            isPlaying = false; 
-        }
-
-        async function initStream() {
-            if (!window.mediaStream) {
-                window.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (contacts.length === 0) {
+                addContactField();
+                return;
             }
-            analyser = audioContext.createAnalyser();
-            const src = audioContext.createMediaStreamSource(window.mediaStream);
-            const processor = audioContext.createScriptProcessor(4096, 1, 1);
-            src.connect(analyser); src.connect(processor); processor.connect(audioContext.destination);
-            visualize();
-            processor.onaudioprocess = (e) => { 
-                if (socket && socket.readyState === 1) { 
-                    const d = e.inputBuffer.getChannelData(0); 
-                    const b = new ArrayBuffer(d.length*2); 
-                    const v = new DataView(b);
-                    for (let i=0; i<d.length; i++) v.setInt16(i*2, Math.max(-1, Math.min(1, d[i])) * (d[i]<0 ? 0x8000 : 0x7FFF), true);
-                    socket.send(b);
+
+            contacts.forEach((contact, idx) => {
+                addContactField(contact.name, contact.phone, idx);
+            });
+        }
+
+        function addContactField(name = '', phone = '', idx = null) {
+            const list = document.getElementById('contactsList');
+            const div = document.createElement('div');
+            div.className = 'contact-card';
+            div.innerHTML = `
+                <input type="text" placeholder="Name" value="${name}"
+                    class="flex-1 bg-transparent border-none text-sm focus:outline-none" data-field="name">
+                <input type="tel" placeholder="+1 (555) 123-4567" value="${phone}"
+                    class="flex-1 bg-transparent border-none text-sm focus:outline-none" data-field="phone">
+                <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-red-400">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            list.appendChild(div);
+        }
+
+        function saveSettings() {
+            userName = document.getElementById('userName').value.trim();
+            localStorage.setItem('userName', userName);
+
+            // Collect contacts
+            const contactCards = document.querySelectorAll('#contactsList .contact-card');
+            contacts = [];
+            contactCards.forEach(card => {
+                const name = card.querySelector('[data-field="name"]').value.trim();
+                const phone = card.querySelector('[data-field="phone"]').value.trim();
+                if (name && phone) {
+                    contacts.push({ name, phone });
                 }
-            };
+            });
+            localStorage.setItem('contacts', JSON.stringify(contacts));
+
+            // Send to server if connected
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'user_profile',
+                    name: userName,
+                    contacts: contacts
+                }));
+            }
+
+            closeSettings();
+            addMessage(`Settings saved! ${contacts.length} contact(s) configured.`, false);
         }
 
-        function updateUI(active) {
-            isRecording = active;
-            if (active) {
-                btn.innerHTML = '<i class="fas fa-stop"></i> End Session';
-                btn.className = "bg-slate-600 hover:bg-slate-500 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg transition-colors";
-                statusText.innerText = "Calyx Active";
-                subStatus.innerText = "Listening...";
-                statusText.className = "text-2xl font-bold mb-1 text-white";
-                document.getElementById('sosContainer').classList.remove("hidden");
-                document.getElementById('sosHint').classList.remove("hidden");
-                modeIcon.classList.add('pulse');
-                document.getElementById("visContainer").children[0].classList.remove('opacity-30');
-                downloadBtn.classList.add("hidden");
+        // Covert mode functions
+        function activateCovertMode() {
+            covertModeActive = true;
+            if (silentMode) {
+                fakeChatScreen.classList.add('active');
             } else {
-                btn.innerHTML = '<i class="fas fa-microphone"></i> Initialize Calyx';
-                btn.className = "bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full w-full shadow-lg flex items-center justify-center gap-2 mb-2 text-lg transition-colors";
-                statusText.innerText = "System Offline";
-                statusText.className = "text-2xl font-bold mb-1 text-white";
-                subStatus.innerText = "Guardian Relay Inactive.";
-                modeIcon.classList.remove('pulse');
-                document.getElementById('sosContainer').classList.add("hidden");
-                document.getElementById('sosHint').classList.add("hidden");
-                document.getElementById("visContainer").children[0].classList.add('opacity-30');
+                fakeCallScreen.classList.add('active');
+                const callerName = contacts.length > 0 ? contacts[0].name : 'Mom';
+                document.getElementById('fakeCallerName').textContent = callerName;
+            }
+        }
+
+        function exitCovertMode() {
+            covertModeActive = false;
+            fakeCallScreen.classList.remove('active');
+            fakeChatScreen.classList.remove('active');
+        }
+
+        function updateLatency(ms) {
+            avgLatency = ms;
+            if (ms > 0 && ms < 2000) {
+                latencyMeter.classList.remove('hidden');
+                latencyMeter.textContent = `${ms}ms`;
+                latencyMeter.className = 'latency-meter ' +
+                    (ms < 500 ? 'latency-good' : ms < 1000 ? 'latency-ok' : 'latency-bad');
+            }
+        }
+
+        function quickScenario(text) {
+            toggleSystem().then(() => {
+                setTimeout(() => sendQuickMessage(text), 800);
+            });
+        }
+
+        function updateStatus(connected, recording = false) {
+            isConnected = connected;
+            isRecording = recording;
+
+            statusIndicator.className = 'status-indicator ' +
+                (recording ? 'recording' : (connected ? 'connected' : 'disconnected'));
+
+            if (recording && !silentMode) {
+                statusText.textContent = 'Listening...';
+            } else if (connected) {
+                statusText.textContent = silentMode ? 'Text mode' : 'Connected';
+            } else {
+                statusText.textContent = 'Tap mic to start';
+            }
+
+            if (recording) {
+                speakButton.classList.add('recording');
+                speakIcon.className = 'fas fa-stop text-4xl text-white';
+            } else {
+                speakButton.classList.remove('recording');
+                speakIcon.className = 'fas fa-microphone text-4xl text-white';
             }
         }
 
         function updateMode(mode) {
-            const icon = document.getElementById('modeIcon');
-            const conf = { 
-                "STEALTH": ["fa-user-secret","text-gray-500", "Stealth Mode"], 
-                "DECOY": ["fa-user-friends","text-orange-500", "Decoy Protocol"], 
-                "PIZZA": ["fa-pizza-slice","text-yellow-400", "Covert Ops"], 
-                "CALM": ["fa-heartbeat","text-pink-400", "Medical / Calm"], 
-                "DEFAULT": ["fa-shield-alt","text-blue-400", "Calyx Active"] 
-            }[mode] || ["fa-shield-alt","text-blue-400", "Calyx Active"];
-            
-            icon.className = `text-6xl mb-4 transition-all duration-500 pulse ${conf[1]} mt-4`;
-            icon.innerHTML = `<i class="fas ${conf[0]}"></i>`;
-            statusText.className = `text-2xl font-bold mb-1 ${conf[1]}`;
-            statusText.innerText = conf[2];
+            currentMode = mode;
+            const modes = {
+                'DEFAULT': { icon: 'fa-shield', text: 'Ready', class: 'mode-default' },
+                'STEALTH': { icon: 'fa-user-secret', text: 'Stealth', class: 'mode-stealth' },
+                'DECOY': { icon: 'fa-phone', text: 'Decoy', class: 'mode-decoy' },
+                'COVERT': { icon: 'fa-mask', text: 'Covert', class: 'mode-covert' },
+                'CALM': { icon: 'fa-heart', text: 'Calm', class: 'mode-calm' },
+                'MEDICAL': { icon: 'fa-kit-medical', text: 'Medical', class: 'mode-medical' },
+                'URGENT': { icon: 'fa-bolt', text: 'Urgent', class: 'mode-urgent' }
+            };
+
+            const config = modes[mode] || modes['DEFAULT'];
+            modeBadge.className = 'mode-badge ' + config.class + ' px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2';
+            modeIcon.className = 'fas ' + config.icon;
+            modeText.textContent = config.text;
+
+            // Update body background to match mode
+            document.body.className = document.body.className.replace(/mode-\w+/g, '');
+            document.body.classList.add(config.class);
+
+            if (mode === 'STEALTH' && !silentMode) toggleSilentMode();
         }
 
-        function visualize() {
-            if (!isRecording) return;
-            requestAnimationFrame(visualize);
-            const l = analyser.frequencyBinCount; const d = new Uint8Array(l); analyser.getByteFrequencyData(d);
-            canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            let x=0; const w=(canvas.width/l)*2.5;
-            for(let i=0; i<l; i++) { 
-                const h=(d[i]/255)*canvas.height; 
-                ctx.fillStyle=`rgb(${h+50},100,255)`; 
-                ctx.fillRect(x,canvas.height-h,w,h); 
-                x+=w+1; 
+        function addMessage(content, isUser = false) {
+            if (welcomeScreen?.parentElement) welcomeScreen.remove();
+
+            const div = document.createElement('div');
+            div.className = 'flex ' + (isUser ? 'justify-end' : 'justify-start');
+
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble ' + (isUser ? 'user' : 'ai') + ' px-4 py-3';
+            bubble.textContent = content;
+
+            div.appendChild(bubble);
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showTyping(show) {
+            typingIndicator.classList.toggle('hidden', !show);
+            if (show) chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function toggleSilentMode() {
+            silentMode = !silentMode;
+            silentToggle.classList.toggle('active', silentMode);
+            visualizerContainer.classList.toggle('hidden', silentMode || !isRecording);
+            updateStatus(isConnected, isRecording);
+
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'silent_mode', enabled: silentMode }));
+            }
+        }
+
+        async function toggleSystem() {
+            if (isConnected) {
+                isRecording = !isRecording;
+                updateStatus(true, isRecording);
+                visualizerContainer.classList.toggle('hidden', silentMode || !isRecording);
+                return;
+            }
+
+            try {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws/chat`);
+                socket.binaryType = 'arraybuffer';
+
+                socket.onopen = async () => {
+                    updateStatus(true, true);
+                    isRecording = true;
+                    quickActions.classList.remove('hidden');
+                    endSessionBtn.classList.remove('hidden');
+
+                    // Small delay to ensure server is ready to receive
+                    await new Promise(r => setTimeout(r, 100));
+
+                    // Send user profile first
+                    if (userName || contacts.length > 0) {
+                        socket.send(JSON.stringify({
+                            type: 'user_profile',
+                            name: userName,
+                            contacts: contacts
+                        }));
+                        console.log('[SOCKET] Sent user profile');
+                    }
+
+                    // Send cached location
+                    if (lastKnownCoords) {
+                        console.log('[GPS] Sending cached location on connect:', lastKnownCoords);
+                        socket.send(JSON.stringify({ type: 'location', coords: lastKnownCoords }));
+                    }
+
+                    // Also send from localStorage
+                    const storedCoords = localStorage.getItem('lastKnownCoords');
+                    if (storedCoords && storedCoords !== lastKnownCoords) {
+                        console.log('[GPS] Sending stored location on connect:', storedCoords);
+                        socket.send(JSON.stringify({ type: 'location', coords: storedCoords }));
+                    }
+
+                    // Try to get fresh location
+                    sendLocation();
+
+                    // Init audio last
+                    await initAudio();
+                };
+
+                socket.onmessage = async (event) => {
+                    if (typeof event.data === 'string') {
+                        try {
+                            handleServerMessage(JSON.parse(event.data));
+                        } catch {
+                            const data = event.data;
+                            if (data.startsWith('DOWNLOAD:')) {
+                                evidenceFile = data.split(':')[1];
+                                downloadToast.classList.remove('hidden');
+                                downloadBtn.classList.remove('hidden');
+                            } else if (data.startsWith('MODE:')) {
+                                updateMode(data.split(':')[1]);
+                            } else if (data === 'CLEAR') {
+                                clearAudioQueue();
+                            }
+                        }
+                    } else if (!silentMode) {
+                        queueAudio(event.data);
+                    }
+                };
+
+                socket.onclose = () => {
+                    updateStatus(false);
+                    isRecording = false;
+                    visualizerContainer.classList.add('hidden');
+                };
+
+                socket.onerror = () => updateStatus(false);
+            } catch (e) {
+                console.error('Connection error:', e);
+                updateStatus(false);
+            }
+        }
+
+        function handleServerMessage(msg) {
+            switch (msg.type) {
+                case 'mode': updateMode(msg.mode); break;
+                case 'ai_text_response':
+                    showTyping(false);
+                    addMessage(msg.content, false);
+                    if (msg.latency) updateLatency(msg.latency);
+                    break;
+                case 'timer_started': showTimer(msg.seconds); break;
+                case 'timer_cancelled': hideTimer(); break;
+                case 'alert_sent':
+                    hideTimer();
+                    addMessage(msg.message || 'Emergency contact alerted.', false);
+                    break;
+                case 'download':
+                    evidenceFile = msg.file;
+                    downloadToast.classList.remove('hidden');
+                    downloadBtn.classList.remove('hidden');
+                    break;
+                case 'session_ended':
+                    addMessage(msg.message || 'Session ended safely.', false);
+                    downloadToast.classList.remove('hidden');
+                    break;
+                case 'clear': clearAudioQueue(); break;
+            }
+        }
+
+        function showTimer(seconds) {
+            timerOverlay.classList.remove('hidden');
+            let remaining = seconds;
+            timerTextEl.textContent = remaining;
+
+            const progress = document.querySelector('.timer-circle .progress');
+            progress.style.animation = 'none';
+            progress.offsetHeight;
+            progress.style.animation = 'countdown 5s linear forwards';
+
+            timerInterval = setInterval(() => {
+                remaining--;
+                timerTextEl.textContent = remaining;
+                if (remaining <= 0) clearInterval(timerInterval);
+            }, 1000);
+        }
+
+        function hideTimer() {
+            timerOverlay.classList.add('hidden');
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        }
+
+        function cancelTimer() {
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'cancel_timer' }));
+            }
+            hideTimer();
+        }
+
+        async function queueAudio(buf) {
+            try {
+                const decoded = await audioCtx.decodeAudioData(buf);
+                audioQueue.push(decoded);
+                if (!isPlaying) playNext();
+            } catch (e) { console.error('Audio decode error:', e); }
+        }
+
+        function playNext() {
+            if (!audioQueue.length) { isPlaying = false; return; }
+            isPlaying = true;
+            const src = audioCtx.createBufferSource();
+            src.buffer = audioQueue.shift();
+            src.connect(audioCtx.destination);
+            src.onended = playNext;
+            src.start();
+            currentSource = src;
+        }
+
+        function clearAudioQueue() {
+            audioQueue = [];
+            if (currentSource) try { currentSource.stop(); } catch {}
+            isPlaying = false;
+        }
+
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const source = audioCtx.createMediaStreamSource(stream);
+
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 64;
+                source.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                if (!silentMode) visualizerContainer.classList.remove('hidden');
+                drawVisualizer();
+
+                const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                source.connect(processor);
+                processor.connect(audioCtx.destination);
+
+                processor.onaudioprocess = (e) => {
+                    if (socket?.readyState === WebSocket.OPEN && isRecording && !silentMode) {
+                        const input = e.inputBuffer.getChannelData(0);
+                        const pcm = new Int16Array(input.length);
+                        for (let i = 0; i < input.length; i++) {
+                            pcm[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
+                        }
+                        socket.send(pcm.buffer);
+                    }
+                };
+            } catch (e) {
+                console.error('Audio init error:', e);
+                addMessage('Mic access needed for voice. Text chat still works.', false);
+            }
+        }
+
+        function drawVisualizer() {
+            if (!analyser) return;
+            requestAnimationFrame(drawVisualizer);
+            if (!isRecording || silentMode) return;
+
+            analyser.getByteFrequencyData(dataArray);
+            const bars = visualizer.children;
+            for (let i = 0; i < bars.length; i++) {
+                const val = dataArray[i] || 0;
+                bars[i].style.height = Math.max(4, (val / 255) * 40) + 'px';
+            }
+        }
+
+        function sendMessage() {
+            const content = chatInput.value.trim();
+            if (!content) return;
+
+            addMessage(content, true);
+            chatInput.value = '';
+
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'text_message', content }));
+                showTyping(true);
+            } else {
+                toggleSystem().then(() => {
+                    setTimeout(() => {
+                        if (socket?.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({ type: 'text_message', content }));
+                            showTyping(true);
+                        }
+                    }, 500);
+                });
+            }
+        }
+
+        function sendQuickMessage(content) {
+            addMessage(content, true);
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'text_message', content }));
+                showTyping(true);
+            }
+        }
+
+        function sendLocation() {
+            return new Promise((resolve) => {
+                console.log('[GPS] sendLocation() called');
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+                            console.log('[GPS] Got coordinates:', coords);
+                            if (socket?.readyState === WebSocket.OPEN) {
+                                const msg = JSON.stringify({ type: 'location', coords });
+                                console.log('[GPS] Sending to server:', msg);
+                                socket.send(msg);
+                            } else {
+                                console.log('[GPS] Socket not open, state:', socket?.readyState);
+                            }
+                            resolve(coords);
+                        },
+                        (err) => {
+                            console.error('[GPS] Geolocation error:', err.code, err.message);
+                            resolve(null);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
+                } else {
+                    console.log('[GPS] Geolocation not supported');
+                    resolve(null);
+                }
+            });
+        }
+
+        async function triggerSOS() {
+            console.log('[SOS] triggerSOS() called');
+            if (contacts.length === 0) {
+                addMessage('Please add emergency contacts in settings first.', false);
+                openSettings();
+                return;
+            }
+
+            // Ensure connection first
+            if (socket?.readyState !== WebSocket.OPEN) {
+                console.log('[SOS] Socket not open, connecting...');
+                await toggleSystem();
+                // Wait for connection to establish
+                let attempts = 0;
+                while (socket?.readyState !== WebSocket.OPEN && attempts < 20) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
+                }
+                console.log('[SOS] Socket state after wait:', socket?.readyState);
+            }
+
+            // Send location multiple ways to ensure it gets through
+            console.log('[SOS] Sending location, cached:', lastKnownCoords);
+
+            // Method 1: Send cached location from localStorage
+            const storedCoords = localStorage.getItem('lastKnownCoords');
+            if (storedCoords && socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'location', coords: storedCoords }));
+                console.log('[SOS] Sent stored location:', storedCoords);
+            }
+
+            // Method 2: Send runtime cached location
+            if (lastKnownCoords && socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'location', coords: lastKnownCoords }));
+                console.log('[SOS] Sent runtime cached location:', lastKnownCoords);
+            }
+
+            // Method 3: Try to get fresh HIGH ACCURACY location (non-blocking)
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const freshCoords = `${pos.coords.latitude},${pos.coords.longitude}`;
+                        const accuracy = pos.coords.accuracy;
+                        console.log('[SOS] Got fresh location:', freshCoords, `(accuracy: ${accuracy}m)`);
+                        if (socket?.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({ type: 'location', coords: freshCoords }));
+                        }
+                        // Update cache with more accurate location
+                        lastKnownCoords = freshCoords;
+                        localStorage.setItem('lastKnownCoords', freshCoords);
+                    },
+                    (err) => console.warn('[SOS] Fresh location failed:', err.message),
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                );
+            }
+
+            // Give server time to process location
+            await new Promise(r => setTimeout(r, 300));
+
+            // Now send SOS
+            if (socket?.readyState === WebSocket.OPEN) {
+                console.log('[SOS] Sending SOS signal');
+                socket.send(JSON.stringify({ type: 'sos' }));
+            } else {
+                console.error('[SOS] Socket not open for SOS!');
+            }
+        }
+
+        function endSession() {
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'end_session' }));
+            }
+        }
+
+        function downloadEvidence() {
+            if (evidenceFile) {
+                window.open(`/static/${evidenceFile}`, '_blank');
+                downloadToast.classList.add('hidden');
             }
         }
     </script>

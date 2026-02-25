@@ -1,72 +1,148 @@
-🛡️ Calyx: The Emotionally Adaptive Crisis Companion
+# Calyx - Emotionally Adaptive Crisis Companion
 
-🚨 The Problem
-Standard voice assistants are loud, robotic, and oblivious to context. In a life-threatening situation—like an intruder, domestic violence, or a medical collapse—you cannot risk speaking to a cheerful bot that shouts, "I found three results for..."
+> **2nd Place - Murf Voice Agent Hackathon @ IIT Bombay Techfest 2025**
 
-You need a silent guardian that listens to your environment, understands covert speech, and acts when you can't.
+Calyx is a real-time AI safety agent that adapts its voice, tone, and strategy to match crisis situations. It uses **Murf Falcon** for ultra-low-latency voice generation, enabling real-time persona switching - from a calm whisper to a commanding male voice - in under 300ms.
 
-💡 The Solution: Calyx
-Calyx is an AI First Responder that bridges the gap between a panic button and 911. It uses Murf Falcon's ultra-low latency and emotional range to adapt its voice, tone, and strategy in real-time.
+## The Problem
 
-🔥 Key Features
+Standard voice assistants are loud, robotic, and context-blind. In a life-threatening situation, you can't risk a cheerful bot shouting responses. You need a **silent guardian** that listens, understands covert speech, and acts when you can't.
 
-🤫 Stealth Mode (Whisper Protocol):
-Detects if you are whispering or hiding.
-Switches Murf Falcon to a low-volume, calm whisper to guide you without giving away your position.
+## How It Works
 
-🍕 Pizza Ops (Covert Dispatch):
-Caught in a hostage situation? Or a situation where you can't talk freely? Order a Pizza.
-Calyx acts as a pizza dispatcher but decodes your order:
-"Spicy" = Armed Threat
-"Extra Napkins" = Injured
-It gathers intel without alerting the attacker and relays it your emergency contact.
+```
+User speaks  -->  Deepgram Nova-2 (STT)  -->  Groq Llama 3.1 (LLM)  -->  Murf Falcon (TTS)  -->  Audio back to user
+                  Real-time transcription     Crisis classification        Adaptive voice            <300ms latency
+                                              Mode/signal detection        Style/pitch/rate switching
+```
 
-📞 Guardian Relay (Live Telephony):
-If you go silent, Calyx takes over. It triggers a real phone call (via Twilio) to your emergency contact.
-The AI speaks to them on your behalf, explains the situation, and sends your Live GPS Location.
+Three concurrent async tasks run per session:
+1. **receive_cmds** - Handles incoming audio, text, GPS, and SOS signals
+2. **process_voice_ai** - STT -> LLM -> TTS voice pipeline
+3. **process_text_ai** - Text-only mode for covert/silent scenarios
 
-🎭 Decoy Protocol (Voice Morphing):
-Need to deter a threat while walking alone? Say "Hey Dad".
-Calyx simulates a fake phone call with a deep, authoritative male voice.
-It holds a realistic conversation with you ("I'm just around the corner") to make it look like help is seconds away, while reaching out to your emergency contact.
+## Key Features
 
-⚡ Tech Stack (Built for Speed)
-Voice Generation: Murf Falcon TTS - The heart of Calyx. Used for instant (<300ms) voice switching (Whisper/Promo/Calm).
-Intelligence: Groq(Llama 3) - Ultra-fast inference to decode context ("Pizza" -> "Hostage") in milliseconds.
-Hearing: Deepgram Nova-2 - Real-time speech-to-text that captures whispers and background noise.
-Telephony: Twilio Media Streams - Connects the AI Brain directly to the global telephone network for live calls.
-Backend: Python(FastAPI) - Asynchronous WebSocket server handling audio streams.
+### Stealth Mode
+Detects whispering or hiding. Switches Murf Falcon to `Meditative` style with low pitch (-10) and slow rate (-15) to respond without giving away your position.
 
-🚀 How It Works (Architecture)
-1. Listen: User audio is streamed via WebSockets to Deepgram.
-2. Think: Groq analyzes the text for triggers (e.g., "Order Pizza") and outputs control signals ([SIGNAL:CALL], [MODE:STEALTH]).
-3. Act:
-  -If [MODE:STEALTH]: Murf Falcon generates audio in "Calm" style with low pitch.
-  -If [SIGNAL:CALL]: Twilio dials the emergency contact.
-4. Bridge: The phone call connects to the same AI brain, allowing the Emergency Contact to ask questions ("Is she hurt?") which the AI answers based on the user's context.
+### Pizza Ops (Covert Dispatch)
+Can't speak freely? "Order a pizza." Calyx acts as a pizza dispatcher while decoding your order:
+- "Spicy" = Armed threat
+- "Extra napkins" = Injured
 
-🛠️ Installation & Setup
-1. Clone the Repository:
-   git clone https://github.com/yourusername/calyx-voice-agent.git ;
-   cd calyx-voice-agent
+It gathers intel without alerting an attacker, then relays the decoded situation to your emergency contact.
 
-2. Install Dependencies:
-   pip install -r requirements.txt
+### Decoy Protocol (Voice Morphing)
+Say "Hey Dad" and Calyx simulates a phone call with `en-IN-aarav` (deep male voice) at pitch -5, acting as a protective family member: *"Hey, where are you? I'm just around the corner."* Meanwhile, it contacts your real emergency contact.
 
-3. Configure Environment Variables Create a .env file in the root directory:
-    Follow the format in the .env.example file
+### Guardian Relay (Live Telephony)
+If you go silent for 10 seconds, Calyx:
+1. Sends SMS with your GPS location to all emergency contacts
+2. Initiates a **live AI phone call** to your primary contact via Twilio
+3. The AI explains the situation and answers questions on your behalf
 
-4. Run the Server:
-   python main.py (or) uvicorn main:app --reload
+### Evidence Vault
+Auto-generates timestamped PDF transcripts with GPS coordinates for post-incident documentation.
 
-5. Access the app:
-   Open http://localhost:8000
+## Murf Falcon Integration
 
+Calyx uses two Murf API endpoints:
 
-🏆 Why Murf Falcon?
-Calyx relies on Murf Falcon because standard TTS allows for neither the speed required for a crisis nor the range required for deception.
-Latency: Falcon's streaming capability allows Calyx to interrupt and respond faster than a human (crucial for "Decoy" mode).
-Range: Only Falcon could switch from a terrified whisper to a commanding male voice instantly, making the "Decoy Protocol" possible.
+| Endpoint | Use Case | Why |
+|----------|----------|-----|
+| `/v1/speech/stream` | Browser audio (24kHz MP3) | Falcon model streaming for <300ms first-byte latency |
+| `/v1/speech/generate` | Phone audio (8kHz WAV) | Twilio requires specific sample rate for telephony |
 
-🎥 Demo Video
-https://drive.google.com/file/d/1Z4EToGAONqq9xTrymd9z1OFLqm0lkfW4/view?usp=sharing
+**10 voice profiles** are defined in [`voice_profiles.py`](backend/models/voice_profiles.py), each mapping to a crisis mode with specific `style`, `rate`, and `pitch` values:
+
+| Profile | Voice | Style | Rate | Pitch | Use Case |
+|---------|-------|-------|------|-------|----------|
+| DEFAULT | en-US-natalie | Conversational | 0 | 0 | Normal companion |
+| STEALTH | en-US-natalie | Meditative | -15 | -10 | Whisper-quiet |
+| DECOY_BROTHER | en-IN-aarav | Conversational | +5 | -5 | Protective male voice |
+| CALM | en-US-natalie | Meditative | -20 | -5 | Panic attack grounding |
+| URGENT | en-US-natalie | Conversational | +10 | +5 | Action-oriented urgency |
+
+The LLM outputs inline control signals (`[MODE:STEALTH]`, `[SIGNAL:CALL]`) that trigger voice profile switches in real-time, without re-initializing the TTS pipeline.
+
+## Project Structure
+
+```
+Calyx/
+├── backend/
+│   ├── main.py                          # FastAPI server, WebSocket endpoints
+│   ├── models/
+│   │   ├── state.py                     # CalyxState, LocationStore, UserProfile, ConversationContext
+│   │   └── voice_profiles.py            # Murf voice configurations per crisis mode
+│   ├── services/
+│   │   ├── murf_service.py              # Murf Falcon TTS (streaming + phone audio)
+│   │   ├── groq_service.py              # Groq LLM (crisis classification + prompts)
+│   │   ├── deepgram_service.py          # Deepgram Nova-2 STT
+│   │   ├── guardian_relay.py            # Multi-contact emergency notification (Twilio)
+│   │   ├── twilio_service.py            # Phone call audio encoding/decoding
+│   │   └── evidence_vault.py            # PDF incident report generation
+│   ├── .env.example
+│   └── requirements.txt
+├── frontend/
+│   └── index.html                       # Full UI (chat, visualizer, covert screens, SOS)
+├── test/
+│   ├── test_murf.py                     # Murf API connectivity test
+│   ├── find_voices.py                   # List available Murf voices
+│   └── check_styles.py                  # Check styles for a voice
+└── README.md
+```
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Fill in your API keys
+```
+
+You'll need:
+- **Murf API key** - [murf.ai/dashboard](https://murf.ai/dashboard/api-keys)
+- **Groq API key** - [console.groq.com](https://console.groq.com/keys)
+- **Deepgram API key** - [console.deepgram.com](https://console.deepgram.com/)
+- **Twilio credentials** - [console.twilio.com](https://console.twilio.com/) (for Guardian Relay)
+- **Ngrok domain** - For Twilio phone call WebSocket tunnel
+
+### 3. Run
+
+```bash
+python main.py
+```
+
+Open [http://localhost:8000](http://localhost:8000)
+
+### 4. For Phone Calls (Guardian Relay)
+
+```bash
+# In a separate terminal
+ngrok http 8000
+# Copy the domain to NGROK_DOMAIN in .env
+```
+
+## Tech Stack
+
+| Component | Technology | Role |
+|-----------|-----------|------|
+| **Voice** | Murf Falcon | Streaming TTS with real-time style switching |
+| **Intelligence** | Groq (Llama 3.1 8B) | Ultra-fast crisis classification and response |
+| **Hearing** | Deepgram Nova-2 | Real-time speech-to-text (browser + phone) |
+| **Telephony** | Twilio Media Streams | Live AI phone calls to emergency contacts |
+| **Backend** | FastAPI + Uvicorn | Async WebSocket server |
+| **Frontend** | Vanilla JS + Tailwind | Web Audio API, Geolocation, WebSocket client |
+
+## Demo
+
+[Watch the demo video](https://drive.google.com/file/d/1Z4EToGAONqq9xTrymd9z1OFLqm0lkfW4/view?usp=sharing)
