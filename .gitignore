@@ -17,6 +17,10 @@ build/
 *.m4a
 *.mp4
 
+# Allow demo videos
+!Final Demo Video.mp4
+!Demo Video.mp4
+
 # Generated evidence reports
 backend/static/evidence_*.pdf
 
