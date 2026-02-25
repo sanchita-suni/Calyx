@@ -147,12 +147,12 @@ ngrok http 8000
 
 ### Full Walkthrough (with Voice-Over)
 
-<video src="Final Demo Video.mp4" controls width="100%"></video>
+[[<video src="Final Demo Video.mp4" controls width="100%"></video>](https://drive.google.com/file/d/1Z4EToGAONqq9xTrymd9z1OFLqm0lkfW4/view?usp=sharing)]
 
 Narrated demo covering all features end-to-end: Stealth Mode, Pizza Ops covert dispatch, Decoy Protocol voice morphing, Guardian Relay live telephony, and Evidence Vault PDF generation. Recorded during initial development before latency optimizations.
 
 ### Sub-Second Latency Demo
 
-<video src="Demo Video.mp4" controls width="100%"></video>
+[<video src="Demo Video.mp4" controls width="100%"></video>](https://drive.google.com/file/d/1RMq0FrHZyLN2vkc812Hg_rxJRSm6lXWG/view?usp=sharing)
 
 After optimizing the STT -> LLM -> TTS pipeline, the full voice loop runs in under one second. This demo captures the latency improvements in action - real-time voice profile switching and crisis response with minimal delay. No voice-over; raw interaction only.
